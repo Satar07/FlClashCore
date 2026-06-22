@@ -23,10 +23,10 @@ type strategyFn = func(proxies []C.Proxy, metadata *C.Metadata, touch bool) C.Pr
 
 type LoadBalance struct {
 	*GroupBase
-	disableUDP     bool
-	strategyFn     strategyFn
-	testUrl        string
-	expectedStatus string
+	disableUDP          bool
+	strategyFn          strategyFn
+	testUrl             string
+	expectedStatus      string
 }
 
 var errStrategy = errors.New("unsupported strategy")
@@ -265,18 +265,18 @@ func NewLoadBalance(option *GroupCommonOption, providers []P.ProxyProvider, stra
 		GroupBase: NewGroupBase(GroupBaseOption{
 			Name:           option.Name,
 			Type:           C.LoadBalance,
-			Hidden:         option.Hidden,
-			Icon:           option.Icon,
 			Filter:         option.Filter,
 			ExcludeFilter:  option.ExcludeFilter,
 			ExcludeType:    option.ExcludeType,
 			TestTimeout:    option.TestTimeout,
 			MaxFailedTimes: option.MaxFailedTimes,
 			Providers:      providers,
+			Hidden:         option.Hidden,
+			Icon:           option.Icon,
 		}),
-		strategyFn:     strategyFn,
-		disableUDP:     option.DisableUDP,
-		testUrl:        option.URL,
-		expectedStatus: option.ExpectedStatus,
+		strategyFn:          strategyFn,
+		disableUDP:          option.DisableUDP,
+		testUrl:             option.URL,
+		expectedStatus:      option.ExpectedStatus,
 	}, nil
 }

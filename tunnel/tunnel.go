@@ -379,6 +379,10 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
 		helper.FindProcess = nil
 	}
 
+	// if findProcessMode.Always() {
+	// 	findPackageName(metadata)
+	// }
+
 	switch mode {
 	case Direct:
 		proxy = proxies["DIRECT"]
@@ -390,6 +394,26 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
 	}
 	return
 }
+
+// func findPackageName(metadata *C.Metadata) {
+// 	if !features.Android {
+// 		uid, path, err := P.FindProcessName(metadata.NetWork.String(), metadata.SrcIP, int(metadata.SrcPort))
+// 		if err != nil {
+// 			log.Debugln("[Process] find process %s error: %v", metadata.String(), err)
+// 		} else {
+// 			metadata.Process = filepath.Base(path)
+// 			metadata.ProcessPath = path
+// 			metadata.Uid = uid
+// 		}
+// 	} else {
+// 		pkg, err := P.FindPackageName(metadata)
+// 		if err != nil {
+// 			log.Debugln("[Process] find process %s error: %v", metadata.String(), err)
+// 		} else {
+// 			metadata.Process = pkg
+// 		}
+// 	}
+// }
 
 // processUDP starts a loop to handle udp packet
 func processUDP(queue chan C.PacketAdapter) {
@@ -643,14 +667,29 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
 				continue
 			}
 
+			// set target for Smart gorup nodes selected
+			if smartRuleType(rule.RuleType()) {
+				metadata.SmartTarget = fmt.Sprintf("%s [%s]", rule.RuleType().String(), rule.Payload())
+			}
+
 			// parse multi-layer nesting
 			passed := false
+			smart := false
 			for adapter := adapter; adapter != nil; adapter = adapter.Unwrap(metadata, false) {
+				if adapter.Type() == C.Smart {
+					smart = true
+				}
+
 				if adapter.Type() == C.Pass {
 					passed = true
 					break
 				}
 			}
+
+			if ! smart {
+				metadata.SmartTarget = ""
+			}
+
 			if passed {
 				log.Debugln("%s match Pass rule", adapter.Name())
 				continue
@@ -678,7 +717,7 @@ func getRules(metadata *C.Metadata) []C.Rule {
 	}
 }
 
-func shouldStopRetry(err error) bool {
+func ShouldStopRetry(err error) bool {
 	if errors.Is(err, resolver.ErrIPNotFound) {
 		return true
 	}
@@ -702,7 +741,7 @@ func retry[T any](ctx context.Context, ft func(context.Context) (T, error), fe f
 			if fe != nil {
 				fe(err)
 			}
-			if shouldStopRetry(err) {
+			if ShouldStopRetry(err) {
 				return
 			}
 			if s.Wait(ctx) == nil {
@@ -715,4 +754,8 @@ func retry[T any](ctx context.Context, ft func(context.Context) (T, error), fe f
 		}
 	}
 	return
+}
+
+func smartRuleType(rt C.RuleType) bool {
+	return C.SmartRuleTypes[rt]
 }

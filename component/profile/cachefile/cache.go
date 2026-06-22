@@ -17,12 +17,13 @@ var (
 	fileMode     os.FileMode = 0o666
 	defaultCache *CacheFile
 
+	bucketStorage          = []byte("storage")
 	bucketSelected         = []byte("selected")
 	bucketFakeip           = []byte("fakeip")
 	bucketFakeip6          = []byte("fakeip6")
 	bucketETag             = []byte("etag")
 	bucketSubscriptionInfo = []byte("subscriptioninfo")
-	bucketStorage          = []byte("storage")
+	bucketSmartStats       = []byte("smart_stats")
 )
 
 // CacheFile store and update the cache file

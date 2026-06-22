@@ -27,6 +27,7 @@ func init() {
 
 type Manager struct {
 	connections        xsync.Map[string, Tracker]
+	smartTarget        xsync.Map[string, *xsync.Map[string, bool]]
 	uploadTemp         atomic.Int64
 	downloadTemp       atomic.Int64
 	uploadBlip         atomic.Int64
@@ -48,10 +49,12 @@ func (m *Manager) Join(c Tracker) {
 		DefaultRequestNotify(c)
 	}
 	m.connections.Store(c.ID(), c)
+	m.joinSmartTarget(c)
 }
 
 func (m *Manager) Leave(c Tracker) {
 	m.connections.Delete(c.ID())
+	m.leaveSmartTarget(c)
 }
 
 func (m *Manager) Get(id string) (c Tracker) {
@@ -153,4 +156,78 @@ type Snapshot struct {
 	UploadTotal   int64          `json:"uploadTotal"`
 	Connections   []*TrackerInfo `json:"connections"`
 	Memory        uint64         `json:"memory"`
+}
+
+func (m *Manager) joinSmartTarget(c Tracker) {
+	target := c.Info().Metadata.SmartTarget
+
+	if target == "" {
+		return
+	}
+
+	result, _ := m.smartTarget.LoadOrStore(target, xsync.NewMap[string, bool]())
+	result.Store(c.ID(), true)
+
+	asn := c.Info().Metadata.DstIPASN
+	if asn != "" && asn != "unknown" {
+		result, _ := m.smartTarget.LoadOrStore(asn, xsync.NewMap[string, bool]())
+		result.Store(c.ID(), true)
+	}
+}
+
+func (m *Manager) leaveSmartTarget(c Tracker) {
+	target := c.Info().Metadata.SmartTarget
+
+	if target == "" {
+		return
+	}
+
+	m.smartTarget.Compute(target, func(result *xsync.Map[string, bool], loaded bool) (*xsync.Map[string, bool], xsync.ComputeOp) {
+		if loaded {
+			result.Delete(c.ID())
+			if result.Size() == 0 {
+				return result, xsync.DeleteOp
+			} else {
+				return result, xsync.UpdateOp
+			}
+		}
+		return result, xsync.CancelOp
+	})
+
+	asn := c.Info().Metadata.DstIPASN
+	if asn != "" && asn != "unknown" {
+		m.smartTarget.Compute(asn, func(result *xsync.Map[string, bool], loaded bool) (*xsync.Map[string, bool], xsync.ComputeOp) {
+			if loaded {
+				result.Delete(c.ID())
+				if result.Size() == 0 {
+					return result, xsync.DeleteOp
+				} else {
+					return result, xsync.UpdateOp
+				}
+			}
+			return result, xsync.CancelOp
+		})
+	}
+}
+
+func (m *Manager) GetSmartTargetIDs(target, asn string) (map[string]bool) {
+	targetIDs := make(map[string]bool)
+
+	if result, ok := m.smartTarget.Load(target); ok {
+		result.Range(func(id string, _ bool) bool {
+			targetIDs[id] = true
+			return true
+		})
+	}
+
+	if asn != "" && asn != "unknown" {
+		if result, ok := m.smartTarget.Load(asn); ok {
+			result.Range(func(id string, _ bool) bool {
+				targetIDs[id] = true
+				return true
+			})
+		}
+	}
+
+	return targetIDs
 }

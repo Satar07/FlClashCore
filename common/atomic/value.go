@@ -2,6 +2,7 @@ package atomic
 
 import (
 	"encoding/json"
+	"reflect"
 	"sync/atomic"
 )
 
@@ -80,4 +81,33 @@ func (t *TypedValue[T]) UnmarshalYAML(unmarshal func(any) error) error {
 func NewTypedValue[T any](t T) (v TypedValue[T]) {
 	v.Store(t)
 	return
+}
+
+// TypedValue[map[K]V]
+func (t *TypedValue[T]) Update(f func(old T) (new T)) {
+	var zero T
+
+	rv := reflect.TypeOf(zero)
+	if rv != nil && rv.Kind() == reflect.Slice {
+		old := t.Load()
+		new := f(old)
+		t.Store(new)
+		return
+	}
+
+	switch any(zero).(type) {
+		case map[string]float64:
+			old := t.Load()
+			new := f(old)
+			t.Store(new)
+			return
+		default:
+			for {
+				old := t.Load()
+				new := f(old)
+				if t.CompareAndSwap(old, new) {
+					return
+				}
+			}
+	}
 }

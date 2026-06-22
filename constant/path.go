@@ -15,9 +15,10 @@ import (
 const Name = "mihomo"
 
 var (
-	GeositeName = "GeoSite.dat"
-	GeoipName   = "GeoIP.dat"
-	ASNName     = "ASN.mmdb"
+	GeositeName    = "GeoSite.dat"
+	GeoipName      = "GeoIP.dat"
+	ASNName        = "ASN.mmdb"
+	SmartmodelName = "Model.bin"
 )
 
 // Path is used to get the configuration path
@@ -222,4 +223,23 @@ func (p *path) GetExecutableFullPath() string {
 	}
 	res, _ := filepath.EvalSymlinks(exePath)
 	return res
+}
+
+func (p *path) SmartModel() string {
+	files, err := os.ReadDir(p.homeDir)
+	if err != nil {
+		return ""
+	}
+	for _, fi := range files {
+		if fi.IsDir() {
+			// 目录则直接跳过
+			continue
+		} else {
+			if strings.EqualFold(fi.Name(), "Model.bin") {
+				SmartmodelName = fi.Name()
+				return P.Join(p.homeDir, fi.Name())
+			}
+		}
+	}
+	return P.Join(p.homeDir, "Model.bin")
 }
